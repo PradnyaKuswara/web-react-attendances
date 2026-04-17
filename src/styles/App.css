@@ -1,0 +1,30 @@
+@import 'tailwindcss';
+@plugin "daisyui";
+
+/* import font poppins use */
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap');
+
+/* custom animation */
+@keyframes flash {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.5;
+  }
+}
+
+/* utility custom */
+@utility animate-flash-step {
+  animation: flash 1s steps(2, jump-none) infinite;
+}
+
+/* dark mode via class OR [data-theme="dark"] */
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
+
+/* daisyUI themes */
+@plugin "daisyui" {
+  themes:
+    winter --default,
+    forest --prefersdark;
+}
