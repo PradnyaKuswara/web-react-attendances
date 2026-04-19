@@ -10,7 +10,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-base-200">
       <div className="mx-auto flex min-h-screen max-w-7xl items-center justify-center p-4 md:p-6">
-        <div className="grid w-full max-w-6xl overflow-hidden rounded-[2rem] border border-base-300 bg-base-100 shadow-2xl lg:grid-cols-2">
+        <div className="grid w-full max-w-6xl overflow-hidden rounded-4xl border border-base-300 bg-base-100 shadow-2xl lg:grid-cols-2">
           {/* Left Side */}
           <div className="relative hidden flex-col justify-between bg-primary p-10 text-primary-content lg:flex">
             <div className="absolute left-0 top-0 h-40 w-40 rounded-full bg-white/10 blur-3xl" />

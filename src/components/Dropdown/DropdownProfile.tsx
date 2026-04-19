@@ -39,7 +39,7 @@ export default function DropdownProfile({
 
       <ul
         tabIndex={0}
-        className="dropdown-content menu z-[60] mt-3 w-64 rounded-2xl border border-base-200 bg-base-100 p-2 shadow-xl"
+        className="dropdown-content menu z-60 mt-3 w-64 rounded-2xl border border-base-200 bg-base-100 p-2 shadow-xl"
       >
         <li className="pointer-events-none mb-1">
           <div className="flex items-center gap-3 rounded-xl px-3 py-3 opacity-100">

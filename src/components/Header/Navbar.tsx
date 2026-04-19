@@ -63,7 +63,7 @@ export default function Navbar() {
 
             <ul
               tabIndex={0}
-              className="menu menu-sm dropdown-content z-[1] mt-3 w-56 rounded-2xl border border-base-200 bg-base-100 p-2 shadow-xl"
+              className="menu menu-sm dropdown-content z-1 mt-3 w-56 rounded-2xl border border-base-200 bg-base-100 p-2 shadow-xl"
             >
               <li className="menu-title">
                 <span>My Account</span>
