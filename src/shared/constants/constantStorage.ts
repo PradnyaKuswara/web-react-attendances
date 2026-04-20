@@ -17,5 +17,8 @@ export const KEY = {
     auth: {
       name: 'AUTH_COOKIE_TOKEN',
     },
+    sessionId: {
+      name: 'SESSION_ID',
+    },
   },
 };

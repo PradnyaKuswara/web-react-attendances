@@ -1,23 +1,41 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  IconAlertCircle,
   IconCalendar,
   IconCamera,
   IconClock,
+  IconLogin2,
+  IconLogout2,
   IconMapPin,
   IconPhoto,
   IconRefresh,
   IconUpload,
   IconX,
 } from '@tabler/icons-react'
+import type { AttendanceInput } from '../../@types/attendance'
+import useAttendanceViewModel from './useAttendanceViewModel'
+import { formattedDateCurrent, formattedDateTimeCurrent, formattedTimeCurrent } from '@/helpers/helper'
+import FileModel from '@/models/FileModel'
+import { toast } from 'react-toastify'
+import { useAuth } from '@/hooks/useAuth'
+import { ROUTE } from '@/shared/constants/constantRoute'
+import { useNavigate } from 'react-router-dom'
 
 type CaptureMode = 'camera' | 'upload'
 
 const AttendancePage = () => {
-  const [description, setDescription] = useState('')
-  const [location, setLocation] = useState('Rumah')
-  const [photo, setPhoto] = useState<File | null>(null)
-  const [preview, setPreview] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { form, onAttendance, onCheckoutAttendance } = useAttendanceViewModel()
+  const { user, refetch, attendance } = useAuth()
+  const navigate = useNavigate()
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors, isSubmitting },
+    reset,
+  } = form
 
   const [currentTime, setCurrentTime] = useState(new Date())
   const [captureMode, setCaptureMode] = useState<CaptureMode>('camera')
@@ -29,9 +47,33 @@ const AttendancePage = () => {
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState('')
 
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
+
+  const [locationError, setLocationError] = useState('')
+  const [deviceLocation, setDeviceLocation] = useState<{
+    latitude: number
+    longitude: number
+  } | null>(null)
+
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  const photoUrl = watch('photo_url')
+
+  const isCheckoutMode = useMemo(() => {
+    return Boolean(attendance?.check_in_at) && !attendance?.check_out_at
+  }, [attendance?.check_in_at, attendance?.check_out_at])
+
+  const currentStepLabel = isCheckoutMode ? 'Checkout Absensi' : 'Check-in Absensi'
+  const submitButtonLabel =
+    isSubmitting || isUploadingPhoto
+      ? 'Mengirim...'
+      : isCheckoutMode
+        ? 'Kirim Checkout'
+        : 'Kirim Check-in'
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -70,27 +112,6 @@ const AttendancePage = () => {
       }
     }
   }, [preview])
-
-  const formattedDate = useMemo(
-    () =>
-      currentTime.toLocaleDateString('id-ID', {
-        weekday: 'long',
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-      }),
-    [currentTime]
-  )
-
-  const formattedTime = useMemo(
-    () =>
-      currentTime.toLocaleTimeString('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      }),
-    [currentTime]
-  )
 
   const stopCamera = () => {
     if (cameraStream) {
@@ -195,16 +216,27 @@ const AttendancePage = () => {
     }
   }
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null
-    if (!file) return
-
+  const setPhotoFile = (file: File | null, previewUrl: string | null) => {
     if (preview?.startsWith('blob:')) {
       URL.revokeObjectURL(preview)
     }
 
-    setPhoto(file)
-    setPreview(URL.createObjectURL(file))
+    setSelectedPhoto(file)
+    setPreview(previewUrl)
+
+    setValue('photo_url', '', {
+      shouldValidate: true,
+      shouldDirty: true,
+      shouldTouch: true,
+    })
+  }
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null
+    if (!file) return
+
+    const objectUrl = URL.createObjectURL(file)
+    setPhotoFile(file, objectUrl)
   }
 
   const dataURLToFile = (dataUrl: string, fileName: string) => {
@@ -251,12 +283,7 @@ const AttendancePage = () => {
     const fileName = `attendance-${Date.now()}.jpg`
     const file = dataURLToFile(dataUrl, fileName)
 
-    if (preview?.startsWith('blob:')) {
-      URL.revokeObjectURL(preview)
-    }
-
-    setPhoto(file)
-    setPreview(dataUrl)
+    setPhotoFile(file, dataUrl)
   }
 
   const removePhoto = () => {
@@ -264,63 +291,171 @@ const AttendancePage = () => {
       URL.revokeObjectURL(preview)
     }
 
-    setPhoto(null)
+    setSelectedPhoto(null)
     setPreview(null)
+
+    setValue('photo_url', '', {
+      shouldValidate: true,
+      shouldDirty: true,
+      shouldTouch: true,
+    })
 
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const getCurrentLocation = async (): Promise<{ latitude: number; longitude: number }> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Browser tidak mendukung geolocation'))
+        return
+      }
 
-    if (!description.trim()) {
-      alert('Deskripsi aktivitas wajib diisi.')
-      return
-    }
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          })
+        },
+        (error) => {
+          let message = 'Gagal mengambil lokasi device'
 
-    if (!photo) {
-      alert('Foto bukti wajib diisi.')
-      return
-    }
+          switch (error.code) {
+            case 1:
+              message = 'Izin lokasi ditolak user'
+              break
+            case 2:
+              message = 'Lokasi tidak tersedia'
+              break
+            case 3:
+              message = 'Permintaan lokasi timeout'
+              break
+          }
 
-    const attendanceDate = new Date()
+          reject(new Error(message))
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        }
+      )
+    })
+  }
 
+  const handleRefreshLocation = async () => {
     try {
-      setIsSubmitting(true)
+      setLocationError('')
+      const coords = await getCurrentLocation()
+      setDeviceLocation(coords)
 
-      const formData = new FormData()
-      formData.append('description', description)
-      formData.append('location', location)
-      formData.append('attendanceDate', attendanceDate.toISOString())
-      formData.append('photo', photo)
+      if (isCheckoutMode) {
+        setValue('check_out_latitude', coords.latitude as never, {
+          shouldValidate: true,
+          shouldDirty: true,
+        })
+        setValue('check_out_longitude', coords.longitude as never, {
+          shouldValidate: true,
+          shouldDirty: true,
+        })
+      } else {
+        setValue('check_in_latitude', coords.latitude, {
+          shouldValidate: true,
+          shouldDirty: true,
+        })
+        setValue('check_in_longitude', coords.longitude, {
+          shouldValidate: true,
+          shouldDirty: true,
+        })
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Gagal mengambil lokasi'
+      setLocationError(message)
+    }
+  }
 
-      // Ganti endpoint sesuai backend kamu
-      // await fetch('/api/attendance', {
-      //   method: 'POST',
-      //   body: formData,
-      // })
+  const uploadImageToS3 = async (file: File): Promise<string> => {
+    const response = await FileModel.uploadFile(file)
 
-      console.log('Attendance payload:')
-      console.log({
-        description,
-        location,
-        attendanceDate: attendanceDate.toISOString(),
-        photoName: photo.name,
-        selectedDeviceId,
+    if (response.statusCode !== 200) {
+      throw new Error('Gagal upload foto ke S3')
+    }
+
+    return response.data?.url || response.url
+  }
+
+  const onSubmit = async (values: AttendanceInput) => {
+    try {
+      setLocationError('')
+
+      if (!selectedPhoto) {
+        toast.error('Foto wajib diisi.')
+        return
+      }
+
+      const coords = await getCurrentLocation()
+      setDeviceLocation(coords)
+
+      setIsUploadingPhoto(true)
+      const uploadedPhotoUrl = await uploadImageToS3(selectedPhoto)
+
+      if (isCheckoutMode) {
+        const checkoutPayload: AttendanceInput = {
+          ...values,
+          user_id: user?.id ?? 0,
+          check_out_latitude: coords.latitude as never,
+          check_out_longitude: coords.longitude as never,
+          photo_url: uploadedPhotoUrl,
+        }
+
+        const result = await onCheckoutAttendance(checkoutPayload)
+
+        if (result instanceof Error) {
+          toast.error(result.message)
+          return
+        }
+
+        toast.success('Checkout berhasil dikirim.')
+      } else {
+        const checkinPayload: AttendanceInput = {
+          ...values,
+          user_id: user?.id ?? 0,
+          check_in_latitude: coords.latitude,
+          check_in_longitude: coords.longitude,
+          photo_url: uploadedPhotoUrl,
+        }
+
+        const result = await onAttendance(checkinPayload)
+
+        if (result instanceof Error) {
+          toast.error(result.message)
+          return
+        }
+
+        toast.success('Check-in berhasil dikirim.')
+      }
+
+      reset({
+        check_in_latitude: undefined,
+        check_in_longitude: undefined,
+        check_out_latitude: undefined as never,
+        check_out_longitude: undefined as never,
+        notes: '',
+        photo_url: '',
       })
 
-      alert('Absen berhasil dikirim.')
-
-      setDescription('')
-      setLocation('Rumah')
+      setDeviceLocation(null)
       removePhoto()
+      refetch(true)
+      navigate(ROUTE.home.path)
     } catch (error) {
-      console.error(error)
-      alert('Terjadi kesalahan saat mengirim absen.')
+      const message =
+        error instanceof Error ? error.message : 'Terjadi kesalahan saat mengirim absen.'
+      alert(message)
     } finally {
-      setIsSubmitting(false)
+      setIsUploadingPhoto(false)
     }
   }
 
@@ -332,12 +467,39 @@ const AttendancePage = () => {
     <section className="min-h-screen bg-base-200 px-4 py-6 md:px-6 lg:px-8">
       <div className="mx-auto max-w-4xl">
         <div className="mb-6">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className={`badge ${isCheckoutMode ? 'badge-warning' : 'badge-primary'} badge-outline`}>
+              {currentStepLabel}
+            </div>
+
+            {attendance?.check_in_at && !attendance?.check_out_at && (
+              <div className="badge badge-info badge-outline">
+                Sudah check-in, lanjut checkout
+              </div>
+            )}
+          </div>
+
           <h1 className="text-2xl font-bold md:text-3xl">Absensi Karyawan</h1>
           <p className="mt-2 text-sm text-base-content/70 md:text-base">
-            Lakukan absensi harian dengan waktu real-time dan unggah bukti kerja dari rumah
-            melalui kamera atau file foto.
+            {isCheckoutMode
+              ? 'Anda sudah melakukan check-in. Saat ini Anda berada di tahap checkout absensi. Submit form ini akan memproses checkout.'
+              : 'Lakukan check-in harian dengan waktu real-time, lokasi device, dan unggah bukti foto melalui kamera atau file.'}
           </p>
         </div>
+
+        {isCheckoutMode && (
+          <div className="alert alert-warning mb-6 rounded-2xl shadow-sm">
+            <IconAlertCircle size={20} />
+            <div>
+              <div className="font-semibold">Mode Checkout Aktif</div>
+              <div className="text-sm">
+                Anda sudah memiliki data check-in pada{' '}
+                {attendance?.check_in_at ? formattedDateTimeCurrent(attendance?.check_in_at) : '-'}.
+                Saat tombol submit ditekan, sistem akan memanggil API checkout.
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="card border border-base-300 bg-base-100 shadow-sm">
           <div className="card-body">
@@ -347,7 +509,7 @@ const AttendancePage = () => {
                   <IconCalendar size={18} />
                   <span>Tanggal Hari Ini</span>
                 </div>
-                <p className="text-base font-bold md:text-lg">{formattedDate}</p>
+                <p className="text-base font-bold md:text-lg">{formattedDateCurrent(currentTime)}</p>
               </div>
 
               <div className="rounded-xl border border-base-300 bg-base-100 p-4">
@@ -355,37 +517,100 @@ const AttendancePage = () => {
                   <IconClock size={18} />
                   <span>Jam Real-time</span>
                 </div>
-                <p className="text-base font-bold md:text-lg">{formattedTime}</p>
+                <p className="text-base font-bold md:text-lg">{formattedTimeCurrent(currentTime)}</p>
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            {(attendance?.check_in_at || attendance?.check_out_at) && (
+              <div className="mb-6 grid gap-4 md:grid-cols-2">
+                <div className="rounded-xl bg-primary/10 p-4">
+                  <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-base-content/70">
+                    <IconLogin2 size={18} />
+                    <span>Check-in Tercatat</span>
+                  </div>
+                  <p className="text-base font-bold text-primary md:text-lg">
+                    {attendance?.check_in_at ? formattedDateTimeCurrent(attendance.check_in_at) : '-'}
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-secondary/10 p-4">
+                  <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-base-content/70">
+                    <IconLogout2 size={18} />
+                    <span>Check-out Tercatat</span>
+                  </div>
+                  <p className="text-base font-bold text-secondary md:text-lg">
+                    {attendance?.check_out_at ? formattedDateTimeCurrent(attendance.check_out_at) : '-'}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               <div>
-                <label className="mb-2 block text-sm font-semibold">Lokasi Bekerja</label>
-                <label className="input input-bordered flex items-center gap-2">
-                  <IconMapPin size={18} className="opacity-70" />
-                  <input
-                    type="text"
-                    className="grow"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="Contoh: Rumah"
-                  />
-                </label>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <label className="block text-sm font-semibold">Lokasi Device</label>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={handleRefreshLocation}
+                  >
+                    <IconRefresh size={16} />
+                    Ambil Lokasi
+                  </button>
+                </div>
+
+                <div className="rounded-xl border border-base-300 bg-base-100 p-4">
+                  <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-base-content/70">
+                    <IconMapPin size={18} />
+                    <span>Koordinat Saat Ini</span>
+                  </div>
+
+                  {deviceLocation ? (
+                    <div className="space-y-1 text-sm">
+                      <p>
+                        <span className="font-semibold">Latitude:</span> {deviceLocation.latitude}
+                      </p>
+                      <p>
+                        <span className="font-semibold">Longitude:</span> {deviceLocation.longitude}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-base-content/60">
+                      Lokasi belum diambil. Saat submit sistem akan mencoba mengambil lokasi
+                      otomatis.
+                    </p>
+                  )}
+
+                  {locationError && <p className="mt-2 text-sm text-error">{locationError}</p>}
+                </div>
               </div>
 
+              <input type="hidden" {...register('check_in_latitude')} />
+              <input type="hidden" {...register('check_in_longitude')} />
+              <input type="hidden" {...register('photo_url')} />
+
               <div>
-                <label className="mb-2 block text-sm font-semibold">Deskripsi Aktivitas</label>
+                <label className="mb-2 block text-sm font-semibold">
+                  {isCheckoutMode ? 'Catatan Checkout / Aktivitas' : 'Catatan / Aktivitas'}
+                </label>
                 <textarea
                   className="textarea textarea-bordered min-h-32 w-full"
-                  placeholder="Contoh: Mengerjakan revisi dashboard admin, meeting harian, dan testing fitur absensi."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder={
+                    isCheckoutMode
+                      ? 'Contoh: Menyelesaikan task harian, finalisasi revisi, closing pekerjaan hari ini.'
+                      : 'Contoh: Meeting harian, revisi dashboard admin, testing fitur absensi.'
+                  }
+                  {...register('notes')}
                 />
+                {errors.notes && (
+                  <p className="mt-1 text-sm text-error">{String(errors.notes.message)}</p>
+                )}
               </div>
 
               <div>
-                <label className="mb-3 block text-sm font-semibold">Bukti Foto Absensi</label>
+                <label className="mb-3 block text-sm font-semibold">
+                  Bukti Foto {isCheckoutMode ? 'Checkout' : 'Absensi'}
+                </label>
 
                 <div className="mb-4 flex flex-wrap gap-2">
                   <button
@@ -527,6 +752,10 @@ const AttendancePage = () => {
 
                 <canvas ref={canvasRef} className="hidden" />
 
+                {errors.photo_url && (
+                  <p className="mt-2 text-sm text-error">{String(errors.photo_url.message)}</p>
+                )}
+
                 {preview && (
                   <div className="mt-4 rounded-2xl border border-base-300 p-3">
                     <div className="relative overflow-hidden rounded-xl">
@@ -548,18 +777,20 @@ const AttendancePage = () => {
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold">
-                          {photo?.name || 'Foto bukti absensi'}
+                          {selectedPhoto?.name || 'Foto bukti absensi'}
                         </p>
                         <p className="text-xs text-base-content/60">
-                          {photo ? `${(photo.size / 1024 / 1024).toFixed(2)} MB` : ''}
+                          {selectedPhoto ? `${(selectedPhoto.size / 1024 / 1024).toFixed(2)} MB` : ''}
                         </p>
+                        {photoUrl && (
+                          <p className="mt-1 text-xs text-success">Foto siap diupload saat submit</p>
+                        )}
                       </div>
 
                       {captureMode === 'upload' && (
                         <label className="btn btn-outline btn-sm">
                           Ganti Foto
                           <input
-                            ref={fileInputRef}
                             type="file"
                             accept="image/*"
                             className="hidden"
@@ -572,20 +803,13 @@ const AttendancePage = () => {
                 )}
               </div>
 
-              <div className="alert alert-info">
-                <span>
-                  Waktu yang akan tersimpan adalah waktu saat tombol kirim ditekan. Kamu juga bisa
-                  memilih kamera laptop secara manual jika kamera HP ikut terdeteksi.
-                </span>
-              </div>
-
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  className={`btn btn-primary min-w-40 ${isSubmitting ? 'btn-disabled' : ''}`}
-                  disabled={isSubmitting}
+                  className={`btn min-w-40 ${isCheckoutMode ? 'btn-warning' : 'btn-primary'}`}
+                  disabled={isSubmitting || isUploadingPhoto}
                 >
-                  {isSubmitting ? 'Mengirim...' : 'Kirim Absen'}
+                  {submitButtonLabel}
                 </button>
               </div>
             </form>

@@ -1,4 +1,5 @@
 import React from 'react';
+import GlobalLoading from '../GlobalLoading';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -18,6 +19,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   return (
     <>
+      <GlobalLoading />
       <main className="min-h-screen">{children}</main>
     </>
   );

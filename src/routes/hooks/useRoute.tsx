@@ -9,6 +9,9 @@ import HomePage from '@/pages/Home/HomePage';
 import AttendancePage from '@/pages/Attendance/AttendancePage';
 import DashboardLayout from '@/components/Layout/DashboardLayout';
 import DashboardPage from '@/pages/Admin/Dashboard/DashboardPage';
+import ProtectedRoute from '../ProtectedRoute';
+import HistoryAttendancePage from '@/pages/HistoryAttendance/HistoryAttendancePage';
+import ManagementUserPage from '@/pages/Admin/ManagementUser/ManagementUserPage';
 
 interface Page {
   path: string;
@@ -24,10 +27,12 @@ const useRoute = () => {
     const userPages: Page[] = [
       { path: ROUTE.home.path, component: HomePage },
       { path: ROUTE.attendance.path, component: AttendancePage },
+      { path: ROUTE.historyAttendance.path, component: HistoryAttendancePage },
     ];
 
     const dashboardPages: Page[] = [
       { path: ROUTE.admin.dashboard.path, component: DashboardPage },
+      { path: ROUTE.admin.managementUsers.path, component: ManagementUserPage },
       // { path: ROUTE.dashboard.managementAttendance.path, component: ManagementAttendancePage },
     ];
 
@@ -46,11 +51,13 @@ const useRoute = () => {
       ({ path, component: Component }) => ({
         path,
         element: (
-          <HomeLayout>
-            <Suspense fallback={<div>Loading...</div>}>
-              <Component />
-            </Suspense>
-          </HomeLayout>
+          <ProtectedRoute>
+            <HomeLayout>
+              <Suspense fallback={<div>Loading...</div>}>
+                <Component />
+              </Suspense>
+            </HomeLayout>
+          </ProtectedRoute>
         ),
       })
     );
@@ -59,11 +66,13 @@ const useRoute = () => {
       ({ path, component: Component }) => ({
         path,
         element: (
-          <DashboardLayout>
-            <Suspense fallback={<div>Loading...</div>}>
-              <Component />
-            </Suspense>
-          </DashboardLayout>
+          <ProtectedRoute>
+            <DashboardLayout>
+              <Suspense fallback={<div>Loading...</div>}>
+                <Component />
+              </Suspense>
+            </DashboardLayout>
+          </ProtectedRoute>
         ),
       })
     );

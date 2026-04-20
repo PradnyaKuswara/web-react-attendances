@@ -8,6 +8,13 @@ import {
 } from "@tabler/icons-react";
 import { useTheme } from "@/hooks/useTheme";
 import DropdownProfile from "../Dropdown/DropdownProfile";
+import useCookies from "@/hooks/useCookies";
+import useGlobalLoading from "@/hooks/useGlobalLoading";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { KEY } from "@/shared/constants/constantStorage";
+import { toast } from "react-toastify";
+import { ROUTE } from "@/shared/constants/constantRoute";
 
 interface HeaderProps {
   sidebarOpen: boolean;
@@ -172,6 +179,28 @@ export default function Header({
 }: HeaderProps): JSX.Element {
   const [searchOpen, setSearchOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const cookies = useCookies();
+  const [loading, setLoading] = useGlobalLoading();
+  const navigate = useNavigate();
+  const { user, refetch } = useAuth();
+
+  const handleLogout = async () => {
+    if (loading) return;
+    setLoading(true);
+
+    try {
+      cookies.removeCookies(KEY.cookie.auth.name, { path: "/" });
+      toast.success("Berhasil logout");
+      navigate(ROUTE.login.path);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Terjadi kesalahan"
+      );
+    } finally {
+      await refetch(true);
+      setLoading(false);
+    }
+  };
 
   return (
     <>
@@ -236,7 +265,7 @@ export default function Header({
 
             <div className="ml-1 h-8 w-px bg-base-200" />
 
-            <DropdownProfile align="right" />
+            <DropdownProfile align="right" handleLogout={handleLogout} user={user} />
           </div>
         </div>
       </header>
