@@ -56,7 +56,6 @@ export default function Sidebar({
 
   return (
     <>
-      {/* Mobile backdrop */}
       <div
         className={`fixed inset-0 z-40 bg-black/20 backdrop-blur-sm transition-opacity lg:hidden ${sidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"
           }`}
@@ -64,7 +63,6 @@ export default function Sidebar({
         aria-hidden="true"
       />
 
-      {/* Sidebar */}
       <aside
         onMouseEnter={() => setDesktopHovered(true)}
         onMouseLeave={() => setDesktopHovered(false)}
@@ -79,7 +77,6 @@ export default function Sidebar({
             : "border-base-200 lg:rounded-r-3xl",
         ].join(" ")}
       >
-        {/* Header */}
         <div className="flex h-16 items-center justify-between border-b border-base-200 px-3">
           <NavLink
             to="/"
@@ -124,12 +121,15 @@ export default function Sidebar({
               stroke="currentColor"
               strokeWidth={2}
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18 18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
 
-        {/* Menu */}
         <div className="flex-1 overflow-y-auto px-3 py-4">
           {menus.map((group, groupIdx) => (
             <section key={groupIdx} className="mb-5">
@@ -146,10 +146,13 @@ export default function Sidebar({
                 {group.menu.map((item, idx) => {
                   const groupKey = `${groupIdx}-${idx}`;
                   const hasChildren = !!item.children?.length;
+
                   const activeChild = item.children?.some((subItem) =>
-                    pathname.startsWith(subItem.href)
+                    pathname === subItem.href ||
+                    pathname.startsWith(subItem.href + "/")
                   );
-                  const isActive =
+
+                  const isItemActive =
                     pathname === item.href ||
                     pathname.startsWith(item.href + "/") ||
                     activeChild;
@@ -162,13 +165,18 @@ export default function Sidebar({
                         <button
                           type="button"
                           onClick={() => toggleGroup(groupKey)}
-                          className={`group flex w-full items-center rounded-2xl px-3 py-3 text-left transition-all ${isActive
-                            ? "bg-primary/10 text-primary"
+                          className={`group flex w-full items-center rounded-2xl px-3 py-3 text-left transition-all ${isItemActive
+                            ? "bg-primary text-primary-content shadow-sm"
                             : "text-base-content hover:bg-base-200/70"
-                            } ${isDesktopExpanded ? "justify-between" : "justify-center"}`}
+                            } ${isDesktopExpanded
+                              ? "justify-between"
+                              : "justify-center"
+                            }`}
                         >
                           <div className="flex min-w-0 items-center gap-3">
-                            <span className="shrink-0">{item.icon}</span>
+                            <span className="shrink-0 text-current [&>svg]:stroke-current [&>svg]:text-current">
+                              {item.icon}
+                            </span>
 
                             <span
                               className={`truncate text-sm font-medium transition-all ${isDesktopExpanded
@@ -198,8 +206,8 @@ export default function Sidebar({
                                   to={subItem.href}
                                   end
                                   onClick={() => setSidebarOpen(false)}
-                                  className={({ isActive: subActive }) =>
-                                    `block rounded-xl px-3 py-2 text-sm transition-all ${subActive
+                                  className={({ isActive }) =>
+                                    `block rounded-xl px-3 py-2 text-sm transition-all ${isActive
                                       ? "bg-primary text-primary-content"
                                       : "text-base-content/70 hover:bg-base-200 hover:text-base-content"
                                     }`
@@ -221,17 +229,21 @@ export default function Sidebar({
                         to={item.href}
                         end
                         onClick={() => setSidebarOpen(false)}
-                        className={({ isActive }) =>
+                        className={() =>
                           [
                             "group flex items-center rounded-2xl px-3 py-3 transition-all",
-                            isDesktopExpanded ? "gap-3 justify-start" : "justify-center",
-                            isActive || isActive
+                            isDesktopExpanded
+                              ? "justify-start gap-3"
+                              : "justify-center",
+                            isItemActive
                               ? "bg-primary text-primary-content shadow-sm"
                               : "text-base-content hover:bg-base-200/70",
                           ].join(" ")
                         }
                       >
-                        <span className="shrink-0">{item.icon}</span>
+                        <span className="shrink-0 text-current [&>svg]:stroke-current [&>svg]:text-current">
+                          {item.icon}
+                        </span>
 
                         <span
                           className={`truncate text-sm font-medium transition-all ${isDesktopExpanded

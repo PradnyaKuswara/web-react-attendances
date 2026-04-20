@@ -2,9 +2,8 @@ import type { User } from "@/@types/user";
 import {
   IconChevronDown,
   IconLogout,
-  IconUserCircle,
 } from "@tabler/icons-react";
-import { Link } from "react-router-dom";
+import { getInitial } from "@/helpers/helper";
 
 
 interface DropdownProfileProps {
@@ -18,7 +17,6 @@ export default function DropdownProfile({
   handleLogout,
   user,
 }: DropdownProfileProps): JSX.Element {
-  console.log(user);
   return (
     <div className={`dropdown ${align === "right" ? "dropdown-end" : "dropdown-start"}`}>
       <button
@@ -28,7 +26,7 @@ export default function DropdownProfile({
         <div className="avatar">
           <div className="w-10 rounded-2xl bg-primary/10 text-primary">
             <div className="flex h-full w-full items-center justify-center font-semibold">
-              {user?.full_name?.split(" ").map((n) => n[0]).join("")}
+              {getInitial(user?.full_name, user?.email)}
             </div>
           </div>
         </div>
@@ -52,7 +50,7 @@ export default function DropdownProfile({
             <div className="avatar">
               <div className="w-12 rounded-2xl bg-primary/10 text-primary">
                 <div className="flex h-full w-full items-center justify-center font-semibold">
-                  {user?.full_name?.split(" ").map((n) => n[0]).join("")}
+                  {getInitial(user?.full_name, user?.email)}
                 </div>
               </div>
             </div>
@@ -66,15 +64,6 @@ export default function DropdownProfile({
               </div>
             </div>
           </div>
-        </li>
-
-        <div className="my-1 h-px bg-base-200" />
-
-        <li>
-          <Link to="/profile" className="rounded-xl">
-            <IconUserCircle size={18} />
-            <span>Profile</span>
-          </Link>
         </li>
 
         <div className="my-1 h-px bg-base-200" />

@@ -21,6 +21,10 @@ export type UserResponseDetail = Response & {
   data: User;
 };
 
+export type UserResponseList = Response & {
+  data: User[];
+};
+
 export type UserInput = {
   role_id: number;
   email: string;
@@ -29,5 +33,6 @@ export type UserInput = {
   position?: string;
   phone?: string;
   avatar?: string;
-  is_active: boolean;
 };
+
+export type UserUpdateInput = Partial<UserInput>;

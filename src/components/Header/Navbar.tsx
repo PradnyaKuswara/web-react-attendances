@@ -1,8 +1,12 @@
+import { getInitial } from "@/helpers/helper";
 import { useAuth } from "@/hooks/useAuth";
 import useCookies from "@/hooks/useCookies";
 import useGlobalLoading from "@/hooks/useGlobalLoading";
+import { useTheme } from "@/hooks/useTheme";
 import { ROUTE } from "@/shared/constants/constantRoute";
 import { KEY } from "@/shared/constants/constantStorage";
+import { THEME } from "@/shared/constants/constantTheme";
+import { IconMoon, IconSun } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -11,6 +15,7 @@ export default function Navbar() {
   const { user, refetch } = useAuth();
   const cookies = useCookies();
   const [loading, setLoading] = useGlobalLoading();
+  const { theme, toggleTheme } = useTheme();
 
   const handleLogout = async () => {
     if (loading) return;
@@ -80,6 +85,14 @@ export default function Navbar() {
 
         {/* Kanan: Avatar */}
         <div className="flex flex-1 justify-end">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="btn btn-ghost btn-circle"
+            aria-label="Toggle theme"
+          >
+            {theme === THEME.DARK ? <IconMoon size={20} /> : <IconSun size={20} />}
+          </button>
           <div className="dropdown dropdown-end">
             <button
               type="button"
@@ -97,10 +110,19 @@ export default function Navbar() {
 
               <div className="avatar">
                 <div className="w-10 rounded-full ring ring-base-200 ring-offset-2 ring-offset-base-100">
-                  <img
-                    alt="Avatar Pengguna"
-                    src="https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp"
-                  />
+                  {user?.avatar ? (
+                    <img
+                      alt="User Avatar"
+                      src={user.avatar}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-base-300 text-base-content">
+                      <span className="text-lg font-semibold">
+                        {getInitial(user?.full_name, user?.email)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </button>

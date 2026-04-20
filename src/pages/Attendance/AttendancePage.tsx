@@ -419,12 +419,12 @@ const AttendancePage = () => {
 
         toast.success('Checkout berhasil dikirim.')
       } else {
-        const checkinPayload: AttendanceInput = {
-          ...values,
+        const checkinPayload: Omit<AttendanceInput, 'check_out_latitude' | 'check_out_longitude'> = {
           user_id: user?.id ?? 0,
           check_in_latitude: coords.latitude,
           check_in_longitude: coords.longitude,
           photo_url: uploadedPhotoUrl,
+          notes: values.notes || '',
         }
 
         const result = await onAttendance(checkinPayload)

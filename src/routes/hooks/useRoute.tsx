@@ -12,6 +12,7 @@ import DashboardPage from '@/pages/Admin/Dashboard/DashboardPage';
 import ProtectedRoute from '../ProtectedRoute';
 import HistoryAttendancePage from '@/pages/HistoryAttendance/HistoryAttendancePage';
 import ManagementUserPage from '@/pages/Admin/ManagementUser/ManagementUserPage';
+import ManagementAttendancesPage from '@/pages/Admin/ManagementAttendances/ManagementAttendancesPage';
 
 interface Page {
   path: string;
@@ -33,7 +34,7 @@ const useRoute = () => {
     const dashboardPages: Page[] = [
       { path: ROUTE.admin.dashboard.path, component: DashboardPage },
       { path: ROUTE.admin.managementUsers.path, component: ManagementUserPage },
-      // { path: ROUTE.dashboard.managementAttendance.path, component: ManagementAttendancePage },
+      { path: ROUTE.admin.managementAttendance.path, component: ManagementAttendancesPage },
     ];
 
     const publicRoutes: RouteObject[] = pages.map(({ path, component: Component }) => ({

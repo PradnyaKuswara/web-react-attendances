@@ -30,11 +30,22 @@ export const formatTime = (value?: string | Date | null) => {
   return formattedTimeCurrent(value as Date);
 };
 
-export const formatDate = (value?: string | null) => {
+export const formatDate = (
+  value?: string | Date | null,
+  variant: 'short' | 'long' = 'long',
+) => {
   if (!value) return '-';
 
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
+  if (Number.isNaN(date.getTime())) return '-';
+
+  if (variant === 'short') {
+    return new Intl.DateTimeFormat('id-ID', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(date);
+  }
 
   return new Intl.DateTimeFormat('id-ID', {
     weekday: 'long',
@@ -81,4 +92,27 @@ export const getStatusClass = (status?: AttendanceStatus) => {
     default:
       return 'badge-ghost';
   }
+};
+
+export const normalizeStatus = (status?: string) => {
+  if (!status) return 'other';
+
+  const lower = status.toLowerCase();
+
+  if (lower.includes('present') || lower.includes('hadir')) return 'present';
+  if (lower.includes('late') || lower.includes('terlambat')) return 'late';
+  if (
+    lower.includes('absent') ||
+    lower.includes('alpha') ||
+    lower.includes('tidak hadir')
+  )
+    return 'absent';
+
+  return 'other';
+};
+
+export const getInitial = (name?: string, email?: string) => {
+  if (name?.trim()) return name.charAt(0).toUpperCase();
+  if (email?.trim()) return email.charAt(0).toUpperCase();
+  return 'U';
 };

@@ -3,7 +3,7 @@ import type { Response } from '@/@types/response';
 export const handleResponse = async (response: Response) => {
   const data = await response.json();
   const errorMessage = data.message || 'Terjadi kesalahan yang tidak terduga.';
-  const isDevelopment = import.meta.env.PUBLIC_NODE_ENV !== 'development';
+  const isDevelopment = import.meta.env.PUBLIC_NODE_ENV === 'development';
 
   switch (data.statusCode) {
     case 200:

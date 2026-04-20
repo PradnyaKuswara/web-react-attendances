@@ -1,19 +1,36 @@
+import type { User, UserInput, UserUpdateInput } from '@/@types/user';
 import { useGetAllUsers } from '@/rests/admin/users/useGetAllUsers';
+import { useDeleteUser } from '@/rests/admin/users/useDeleteUser';
+import { useInsertUser } from '@/rests/admin/users/useInsertUser';
+import { useUpdateUser } from '@/rests/admin/users/useUpdateUser';
 import { useMemo, useState } from 'react';
+import { useUpdateUserStatus } from '@/rests/admin/users/useUpdateStatus';
+import UserFormModal from './Modal/UserFormModal';
+import { toast } from 'react-toastify';
+import { getInitial } from '@/helpers/helper';
 
 const ITEMS_PER_PAGE = 10;
 
 const ManagementUserPage = () => {
   const { data: users = [], isLoading, isError } = useGetAllUsers();
 
+  const insertUserMutation = useInsertUser();
+  const updateUserMutation = useUpdateUser();
+  const deleteUserMutation = useDeleteUser();
+  const updateStatusMutation = useUpdateUserStatus();
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [page, setPage] = useState(1);
 
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'update'>('create');
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
   const filteredUsers = useMemo(() => {
     const keyword = search.toLowerCase();
 
-    return users.filter((user: any) => {
+    return users.filter((user: User) => {
       const matchSearch =
         user.full_name?.toLowerCase().includes(keyword) ||
         user.email?.toLowerCase().includes(keyword) ||
@@ -48,10 +65,67 @@ const ManagementUserPage = () => {
     setPage(1);
   };
 
-  const getInitial = (name?: string, email?: string) => {
-    if (name?.trim()) return name.charAt(0).toUpperCase();
-    if (email?.trim()) return email.charAt(0).toUpperCase();
-    return 'U';
+  const openCreateModal = () => {
+    setModalMode('create');
+    setSelectedUser(null);
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (user: User) => {
+    setModalMode('update');
+    setSelectedUser(user);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedUser(null);
+  };
+
+  const handleSubmitUser = async (data: UserInput | UserUpdateInput) => {
+    try {
+      if (modalMode === 'create') {
+        await insertUserMutation.mutateAsync(data as UserInput);
+        toast.success('User berhasil ditambahkan');
+      } else if (selectedUser) {
+        await updateUserMutation.mutateAsync({
+          id: selectedUser.id,
+          data: data as UserUpdateInput,
+        });
+        toast.success('User berhasil diupdate');
+      }
+
+      closeModal();
+    } catch (error: unknown) {
+      console.error(error);
+      toast.error((error as Error).message);
+    }
+  };
+
+  const handleDeleteUser = async (user: User) => {
+    const confirmed = window.confirm(`Yakin ingin menghapus user ${user.full_name || user.email}?`);
+    if (!confirmed) return;
+
+    try {
+      await deleteUserMutation.mutateAsync(user.id);
+      toast.success('User berhasil dihapus');
+    } catch (error: unknown) {
+      console.error(error);
+      toast.error((error as Error).message);
+    }
+  };
+
+  const handleToggleStatus = async (user: User) => {
+    try {
+      await updateStatusMutation.mutateAsync({
+        id: user.id,
+        is_active: !user.is_active,
+      });
+      toast.success('Status user berhasil diubah');
+    } catch (error: unknown) {
+      console.error(error);
+      toast.error((error as Error).message);
+    }
   };
 
   if (isLoading) {
@@ -103,23 +177,29 @@ const ManagementUserPage = () => {
           </p>
         </div>
 
-        <div className="stats bg-base-100 shadow-sm border border-base-200">
-          <div className="stat px-6">
-            <div className="stat-title">Total Users</div>
-            <div className="stat-value text-primary text-3xl">{users.length}</div>
-          </div>
-          <div className="stat px-6">
-            <div className="stat-title">Active</div>
-            <div className="stat-value text-success text-3xl">
-              {users.filter((u: any) => u.is_active).length}
+        <div className="flex gap-3 items-center">
+          <div className="stats bg-base-100 shadow-sm border border-base-200">
+            <div className="stat px-6">
+              <div className="stat-title">Total Users</div>
+              <div className="stat-value text-primary text-3xl">{users.length}</div>
+            </div>
+            <div className="stat px-6">
+              <div className="stat-title">Active</div>
+              <div className="stat-value text-success text-3xl">
+                {users.filter((u: User) => u.is_active).length}
+              </div>
+            </div>
+            <div className="stat px-6">
+              <div className="stat-title">Inactive</div>
+              <div className="stat-value text-error text-3xl">
+                {users.filter((u: User) => !u.is_active).length}
+              </div>
             </div>
           </div>
-          <div className="stat px-6">
-            <div className="stat-title">Inactive</div>
-            <div className="stat-value text-error text-3xl">
-              {users.filter((u: any) => !u.is_active).length}
-            </div>
-          </div>
+
+          <button className="btn btn-primary" onClick={openCreateModal}>
+            + Tambah User
+          </button>
         </div>
       </div>
 
@@ -187,11 +267,12 @@ const ManagementUserPage = () => {
                   <th>Phone</th>
                   <th>Status</th>
                   <th>Created At</th>
+                  <th className="text-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedUsers.length > 0 ? (
-                  paginatedUsers.map((user: any) => (
+                  paginatedUsers.map((user: User) => (
                     <tr key={user.id} className="hover">
                       <td>
                         <div className="flex items-center gap-3">
@@ -208,15 +289,9 @@ const ManagementUserPage = () => {
                           </div>
 
                           <div>
-                            <div className="font-semibold">
-                              {user.full_name || '-'}
-                            </div>
-                            <div className="text-sm text-base-content/70">
-                              {user.email}
-                            </div>
-                            <div className="text-xs text-base-content/50">
-                              {user.uuid}
-                            </div>
+                            <div className="font-semibold">{user.full_name || '-'}</div>
+                            <div className="text-sm text-base-content/70">{user.email}</div>
+                            <div className="text-xs text-base-content/50">{user.uuid}</div>
                           </div>
                         </div>
                       </td>
@@ -232,8 +307,7 @@ const ManagementUserPage = () => {
 
                       <td>
                         <div
-                          className={`badge ${user.is_active ? 'badge-success' : 'badge-error'
-                            } badge-soft`}
+                          className={`badge ${user.is_active ? 'badge-success' : 'badge-error'} badge-soft`}
                         >
                           {user.is_active ? 'Active' : 'Inactive'}
                         </div>
@@ -246,11 +320,36 @@ const ManagementUserPage = () => {
                           year: 'numeric',
                         })}
                       </td>
+
+                      <td>
+                        <div className="flex flex-wrap gap-2 justify-center">
+                          <button
+                            className="btn btn-sm btn-info btn-outline"
+                            onClick={() => openEditModal(user)}
+                          >
+                            Edit
+                          </button>
+
+                          <button
+                            className={`btn btn-sm ${user.is_active ? 'btn-warning' : 'btn-success'} btn-outline`}
+                            onClick={() => handleToggleStatus(user)}
+                          >
+                            {user.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                          </button>
+
+                          <button
+                            className="btn btn-sm btn-error btn-outline"
+                            onClick={() => handleDeleteUser(user)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={7}>
                       <div className="flex flex-col items-center justify-center py-14 text-center">
                         <div className="mb-3 text-5xl">📭</div>
                         <h3 className="text-lg font-semibold">Data tidak ditemukan</h3>
@@ -281,15 +380,11 @@ const ManagementUserPage = () => {
                 </button>
 
                 {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .slice(
-                    Math.max(page - 3, 0),
-                    Math.min(Math.max(page - 3, 0) + 5, totalPages)
-                  )
+                  .slice(Math.max(page - 3, 0), Math.min(Math.max(page - 3, 0) + 5, totalPages))
                   .map((pageNumber) => (
                     <button
                       key={pageNumber}
-                      className={`join-item btn btn-sm ${page === pageNumber ? 'btn-primary' : ''
-                        }`}
+                      className={`join-item btn btn-sm ${page === pageNumber ? 'btn-primary' : ''}`}
                       onClick={() => setPage(pageNumber)}
                     >
                       {pageNumber}
@@ -308,6 +403,15 @@ const ManagementUserPage = () => {
           )}
         </div>
       </div>
+
+      <UserFormModal
+        isOpen={isModalOpen}
+        mode={modalMode}
+        user={selectedUser}
+        isSubmitting={insertUserMutation.isPending || updateUserMutation.isPending}
+        onClose={closeModal}
+        onSubmit={handleSubmitUser}
+      />
     </div>
   );
 };

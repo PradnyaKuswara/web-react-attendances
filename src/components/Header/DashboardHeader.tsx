@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   IconBell,
   IconMenu2,
@@ -15,6 +15,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { KEY } from "@/shared/constants/constantStorage";
 import { toast } from "react-toastify";
 import { ROUTE } from "@/shared/constants/constantRoute";
+import { THEME } from "@/shared/constants/constantTheme";
+import SidebarItem from "../Sidebar/SidebarItem";
 
 interface HeaderProps {
   sidebarOpen: boolean;
@@ -28,33 +30,6 @@ interface SearchItem {
   href: string;
 }
 
-const searchItems: SearchItem[] = [
-  {
-    id: 1,
-    title: "Dashboard",
-    desc: "Lihat ringkasan utama aplikasi",
-    href: "/",
-  },
-  {
-    id: 2,
-    title: "Attendance",
-    desc: "Kelola absensi dan riwayat kehadiran",
-    href: "/attendance",
-  },
-  {
-    id: 3,
-    title: "Profile",
-    desc: "Lihat dan edit profil akun",
-    href: "/profile",
-  },
-  {
-    id: 4,
-    title: "Settings",
-    desc: "Atur preferensi aplikasi",
-    href: "/settings",
-  },
-];
-
 function SearchModal({
   open,
   onClose,
@@ -63,53 +38,166 @@ function SearchModal({
   onClose: () => void;
 }): JSX.Element | null {
   const [query, setQuery] = useState("");
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const navigate = useNavigate();
+
+  const { menus } = SidebarItem();
+
+  const searchItems: SearchItem[] = useMemo(() => {
+    return menus.flatMap((group, groupIndex) =>
+      group.menu.flatMap((item, itemIndex) => {
+        const parentItem: SearchItem = {
+          id: Number(`${groupIndex + 1}${itemIndex + 1}`),
+          title: item.label,
+          desc: item.desc || `Buka halaman ${item.label}`,
+          href: item.href,
+        };
+
+        const children =
+          item.children?.map((child, childIndex) => ({
+            id: Number(`${groupIndex + 1}${itemIndex + 1}${childIndex + 1}`),
+            title: child.label,
+            desc: child.desc || `${item.label} / ${child.label}`,
+            href: child.href,
+          })) ?? [];
+
+        return [parentItem, ...children];
+      })
+    );
+  }, [menus]);
+
+  const filteredItems = useMemo(() => {
+    const q = query.toLowerCase().trim();
+
+    if (!q) return searchItems;
+
+    return searchItems.filter((item) => {
+      return (
+        item.title.toLowerCase().includes(q) ||
+        item.desc.toLowerCase().includes(q) ||
+        item.href.toLowerCase().includes(q)
+      );
+    });
+  }, [query, searchItems]);
+
+  const handleSelect = (item: SearchItem) => {
+    const dialog = dialogRef.current;
+
+    if (dialog?.open) {
+      dialog.close();
+    }
+
+    onClose();
+
+    setTimeout(() => {
+      navigate(item.href);
+    }, 0);
+
+    setQuery("");
+    setSelectedIndex(0);
+  };
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
 
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
+    if (open && !dialog.open) {
+      dialog.showModal();
+    }
+
+    if (!open && dialog.open) {
+      dialog.close();
+    }
   }, [open]);
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
+    if (open) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
+    } else {
+      setQuery("");
+      setSelectedIndex(0);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [query]);
+
+  useEffect(() => {
+    const selectedEl = itemRefs.current[selectedIndex];
+    selectedEl?.scrollIntoView({
+      block: "nearest",
+    });
+  }, [selectedIndex]);
+
+  useEffect(() => {
+    const onGlobalKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         if (!dialogRef.current?.open) {
           dialogRef.current?.showModal();
+          setTimeout(() => inputRef.current?.focus(), 0);
         }
       }
     };
 
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onGlobalKeyDown);
+    return () => window.removeEventListener("keydown", onGlobalKeyDown);
   }, []);
 
-  const filteredItems = searchItems.filter((item) => {
-    const q = query.toLowerCase();
-    return (
-      item.title.toLowerCase().includes(q) || item.desc.toLowerCase().includes(q)
-    );
-  });
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!filteredItems.length) return;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setSelectedIndex((prev) =>
+        prev + 1 >= filteredItems.length ? 0 : prev + 1
+      );
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setSelectedIndex((prev) =>
+        prev - 1 < 0 ? filteredItems.length - 1 : prev - 1
+      );
+      return;
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const selectedItem = filteredItems[selectedIndex];
+      if (selectedItem) {
+        handleSelect(selectedItem);
+      }
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onClose();
+    }
+  };
 
   return (
-    <dialog
-      ref={dialogRef}
-      className="modal"
-      onClose={onClose}
-    >
+    <dialog ref={dialogRef} className="modal" onClose={onClose}>
       <div className="modal-box max-w-2xl rounded-3xl border border-base-200 bg-base-100 p-0 shadow-2xl">
         <div className="border-b border-base-200 p-4">
           <label className="input input-bordered flex h-14 w-full items-center gap-3 rounded-2xl border-base-200 bg-base-100 px-4">
             <IconSearch size={18} className="text-base-content/50" />
             <input
+              ref={inputRef}
               type="text"
               className="grow bg-transparent text-sm outline-none"
               placeholder="Cari menu, halaman, atau fitur..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
               autoFocus
             />
             <kbd className="kbd kbd-sm hidden sm:inline-flex">ESC</kbd>
@@ -123,27 +211,52 @@ function SearchModal({
 
           <div className="space-y-1">
             {filteredItems.length > 0 ? (
-              filteredItems.map((item) => (
-                <a
-                  key={item.id}
-                  href={item.href}
-                  className="flex items-start gap-3 rounded-2xl px-3 py-3 transition hover:bg-base-200"
-                  onClick={onClose}
-                >
-                  <div className="mt-0.5 rounded-xl bg-primary/10 p-2 text-primary">
-                    <IconSearch size={16} />
-                  </div>
+              filteredItems.map((item, index) => {
+                const isSelected = index === selectedIndex;
 
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold text-base-content">
-                      {item.title}
+                return (
+                  <button
+                    key={item.id}
+                    ref={(el) => {
+                      itemRefs.current[index] = el;
+                    }}
+                    type="button"
+                    onClick={() => handleSelect(item)}
+                    className={`flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left transition ${isSelected
+                      ? "bg-primary text-primary-content"
+                      : "hover:bg-base-200"
+                      }`}
+                  >
+                    <div
+                      className={`mt-0.5 rounded-xl p-2 ${isSelected
+                        ? "bg-primary-content/15 text-primary-content"
+                        : "bg-primary/10 text-primary"
+                        }`}
+                    >
+                      <IconSearch size={16} />
                     </div>
-                    <div className="truncate text-xs text-base-content/60">
-                      {item.desc}
+
+                    <div className="min-w-0 flex-1">
+                      <div
+                        className={`truncate text-sm font-semibold ${isSelected
+                          ? "text-primary-content"
+                          : "text-base-content"
+                          }`}
+                      >
+                        {item.title}
+                      </div>
+                      <div
+                        className={`truncate text-xs ${isSelected
+                          ? "text-primary-content/80"
+                          : "text-base-content/60"
+                          }`}
+                      >
+                        {item.desc}
+                      </div>
                     </div>
-                  </div>
-                </a>
-              ))
+                  </button>
+                );
+              })
             ) : (
               <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
                 <div className="mb-3 rounded-2xl bg-base-200 p-3 text-base-content/60">
@@ -159,7 +272,7 @@ function SearchModal({
         </div>
 
         <div className="flex items-center justify-between border-t border-base-200 px-4 py-3 text-xs text-base-content/50">
-          <span>Gunakan Ctrl/Cmd + K untuk membuka pencarian</span>
+          <span>Gunakan ↑ ↓ untuk navigasi, Enter untuk pilih</span>
           <form method="dialog">
             <button className="btn btn-ghost btn-sm rounded-xl">Tutup</button>
           </form>
@@ -251,17 +364,14 @@ export default function Header({
               <span className="absolute right-2 top-2 size-2 rounded-full bg-error" />
             </button>
 
-            <label className="swap swap-rotate btn btn-ghost btn-circle">
-              <input
-                type="checkbox"
-                onChange={toggleTheme}
-                checked={theme === "dark"}
-                aria-label="Toggle theme"
-              />
-
-              <IconSun className="swap-off" size={20} />
-              <IconMoon className="swap-on" size={20} />
-            </label>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="btn btn-ghost btn-circle"
+              aria-label="Toggle theme"
+            >
+              {theme === THEME.DARK ? <IconMoon size={20} /> : <IconSun size={20} />}
+            </button>
 
             <div className="ml-1 h-8 w-px bg-base-200" />
 

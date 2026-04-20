@@ -1,4 +1,10 @@
-import type { UserInput, UserResponseDetail } from '@/@types/user';
+import type { RoleResponseList } from '@/@types/role';
+import type {
+  UserInput,
+  UserResponseDetail,
+  UserResponseList,
+  UserUpdateInput,
+} from '@/@types/user';
 import { ApiClient } from '@/services/ApiClient';
 import * as yup from 'yup';
 
@@ -68,7 +74,7 @@ class UserModel {
 
   public async updateUser(
     id: number,
-    data: UserInput,
+    data: UserUpdateInput,
   ): Promise<UserResponseDetail> {
     return this.apiClient.put(`/admin/users/${id}`, data, true);
   }
@@ -81,8 +87,19 @@ class UserModel {
     return this.apiClient.get(`/admin/users/${id}`, true);
   }
 
-  public async getUsers(): Promise<UserResponseDetail> {
+  public async getUsers(): Promise<UserResponseList> {
     return this.apiClient.get('/admin/users', true);
+  }
+
+  public async updateStatus(
+    id: number,
+    data: { is_active: boolean },
+  ): Promise<UserResponseDetail> {
+    return this.apiClient.patch(`/admin/users/${id}/status`, data, true);
+  }
+
+  public async getRole(): Promise<RoleResponseList> {
+    return this.apiClient.get(`/admin/users/roles`, true);
   }
 }
 

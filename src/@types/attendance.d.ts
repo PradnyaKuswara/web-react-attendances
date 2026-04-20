@@ -18,6 +18,8 @@ export type Attendance = {
   created_at?: string | Date;
   updated_at?: string | Date;
   deleted_at?: string | Date | null;
+  user?: User;
+  uuid?: string;
 };
 
 export type AttendanceResponseDetail = Response & {
@@ -32,8 +34,8 @@ export type AttendanceInput = {
   user_id: number;
   check_in_latitude: number;
   check_in_longitude: number;
-  check_out_latitude: number;
-  check_out_longitude: number;
+  check_out_latitude?: number;
+  check_out_longitude?: number;
   notes: string;
   photo_url: string;
 };

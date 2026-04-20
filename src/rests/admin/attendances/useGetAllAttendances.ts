@@ -6,7 +6,7 @@ export const useGetAllAttendances = () => {
     queryKey: ['attendances-admin'],
     queryFn: async () => {
       const response = await AttendancesModel.getAttendancesByAdmin();
-      return response;
+      return response?.data;
     },
   });
 };

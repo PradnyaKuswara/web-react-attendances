@@ -84,13 +84,13 @@ export class ApiClient {
     let requestData: FormData | object;
 
     if (data instanceof FormData) {
-      data.append('_method', 'PATCH');
+      // data.append('_method', 'PATCH');
       requestData = data;
     } else {
-      requestData = { _method: 'PATCH', ...data };
+      requestData = { ...data };
     }
 
-    return this.request<T>('POST', url, requestData, withAuth);
+    return this.request<T>('PATCH', url, requestData, withAuth);
   }
 
   public async delete<T>(
