@@ -1,11 +1,20 @@
-import './App.css';
+import { AuthProvider } from './providers/AuthProvider';
+import ReactQueryClientProvider from './providers/ReactQueryClientProvider';
+import ThemeProvider from './providers/ThemeProvider';
+import RouteWeb from './routes/Route';
+import './styles/App.css';
+import { ToastContainer } from 'react-toastify';
 
 const App = () => {
   return (
-    <div className="content">
-      <h1>Rsbuild with React</h1>
-      <p>Start building amazing things with Rsbuild.</p>
-    </div>
+    <ThemeProvider>
+      <ReactQueryClientProvider>
+        <AuthProvider>
+          <ToastContainer />
+          <RouteWeb />
+        </AuthProvider>
+      </ReactQueryClientProvider>
+    </ThemeProvider>
   );
 };
 
